@@ -1,115 +1,70 @@
-﻿using System;
+﻿using NAudio.Wave;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 /*
- * 서브스레드를 기반으로한 경주 프로그램
- * 기능
- * 메인스레드는 서브스레드가 모두 종료할때까지 도달지점을 화면에 출력
- * 서브스레드는 골인지점에 도착하면 등수를 저장하는 변수에 등번호 입력하기.
- * 모든 서브스레드가 종료하면 등수를 출력.
+ * naudio 라이브러리를 활용한 mp3플레이어 예제 
+ * 기능)
+ * 특정한 mp3파일을 서브스레드로 재생
+ * 사용자입력으로 음악재생이 되는 중에 종료
  * 
  */
 
 namespace 스레드
 {
-    //선수 정의
-    class Player
-    {
-        //정적변수로 순위를 저장하는 배열과 인덱스저장 변수 선언
-        public static int[] rank;
-        public static int rank_index;
-        //현재 지점, 등번호, 종료 여부
-        public int distance, number;
-        public bool isFinish;
-        //서브스레드로 동작할 달리기 함수 정의
-        public void run(object seed)
-        { //seed값은 보편적으로 현재시간으로 해서 랜덤하게 줌
-            isFinish = false;
-            //달리기
-            //Random : 난수를 생성할 때 사용하는 클래스
-            Random random = new Random((int)DateTime.Now.Ticks+((int) seed));
-            //Random.Next(최대값) : 0~ 최대값 사이의 임의의 숫자를 반환하는 함수
-            for(distance = 0; distance< 1000; distance += random.Next(40))
-            {
-                Thread.Sleep(50);
-            }
-            isFinish = true;
-            //도착 후 순위 등록
-            //lock(변수) : 특정 변수를 접근하는 다양한 스레드들의 데이터 입력/변경을 순차적으로 진행하도록 처리하는 문법
-            //ex) 1, 5번 스레드가 거의 동시에 rank변수 접근하는 경우 가장먼저 lock문법에 도착한 스레드가 점유하는 동안 다른 스레드가 대기상태로 정지함.
-            lock (rank)
-            {
-                rank[rank_index] = number;
-                rank_index++;
-            }
-            
-        }
-    }
+    
     class Program
     {
+        // 생성된 (또는 생성할) 서브스레드를 강제종료할 수 있는 토큰을 생성할 수 있는 클래스다.
+        static CancellationTokenSource source;
         static void Main(string[] args)
         {
-            int num = 10;
-            //랭크변수 초기화
-            Player.rank = new int[num];
-            Player.rank_index = 0;
-
-            Player[] players = new Player[num];
-            //선수 수만큼 객체 생성
-            for(int i = 0; i <num; i++)
+            source = new CancellationTokenSource();
+            //재생할 파일명을 사용자 입력으로 받기
+            Console.Write("실행할 파일의 이름을 입력(확장자명포함)");
+            string filename = Console.ReadLine();
+            //서브스레드를 생성하면서 파일명 전달
+            //서브스레드 종료를 위한 토큰 전달
+            //전달 된 토큰이 이미 취소 명령이 내리진 상태면 서브스레드가 시작하지 않음
+            Task task = new Task(new Action<object>(play_music),filename, source.Token);
+            task.Start();
+            Console.WriteLine("음악재생 중");
+            //무한 반복 
+            /*for(; ; )
             {
-                players[i] = new Player();
-                players[i].number = i;
-            }
-
-            Task[] tasks = new Task[num];
-            //서브스레드 - Player객체의 run 메소드
-            for(int i =0; i <num; i++)
-            {
-                tasks[i] = new Task(new Action<object>(players[i].run),i);
-            }
-            Console.WriteLine("시작하려면 엔터키를 누르세요");
+                Console.WriteLine("메인 스레드 대기");
+                Thread.Sleep(5000);
+            }*/
+            
+            Console.WriteLine("음악을 종료하려면 엔터키를 누르세요");
             Console.ReadLine();
-            //서브스레드 시작
-            for(int i = 0; i < num; i++)
-                tasks[i].Start();
-            //반복문- 모든 선수가 도착할때까지 대기
-            for(; ; )
+            source.Cancel(); //엔터키 입력대기 source객체의 토큰을 가진 모든 서브스레드 취소명령 호출
+            
+            Console.WriteLine("음악 재생 종료");
+        }
+        //음악재생에 사용되는 서브스레드 함수
+        static void play_music(object filename)
+        {
+            // 하드디스크에 저장된 음악파일을 로드하는 객체 생성
+            AudioFileReader audioFile = new AudioFileReader((string)filename);
+            // 스피커에 음악파일을 출력할때 사용하는 객체 생성
+            using (WaveOutEvent wave = new WaveOutEvent())
             {
-                //선수들이 경기를 마쳤느지 확인
-                bool isAllFinsih = true;
-                for(int i =0; i <num; i++)
+                //재생할 음악파일 객체를 설정
+                wave.Init(audioFile);
+                wave.Play(); //설정된 음악파일 재생
+                //음악파일을 모두 재생할때까지 대기
+                while (source.IsCancellationRequested == false &&
+                    wave.PlaybackState == PlaybackState.Playing)
                 {
-                    if ((isAllFinsih = players[i].isFinish) == false)
-                    {
-                        break;
-                    }
+                    Thread.Sleep(500);
                 }
-                if (isAllFinsih)
-                {
-                    Console.WriteLine("경기종료");
-                    break;
-                }
-                Console.Clear();
-                //Player객체의 distance값을 화면에 출력
-                for(int i=0; i<num; i++)
-                {
-                    Console.WriteLine("{0} : {1}",players[i].number+1,players[i].distance);
-                }
-                Thread.Sleep(100);
-                Thread.Sleep(100);
             }
-            Console.WriteLine("순위\t번호");
-            Console.WriteLine("-------------------------------------");
-            //순위 출력
-            for(int i = 0; i < num; i++)
-            {
-                Console.WriteLine("{0}\t{1}", i+1, Player.rank[i]+1);
-            }
-
+            audioFile.Close();
+            
         }
     }
 }
