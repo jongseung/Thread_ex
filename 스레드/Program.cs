@@ -15,12 +15,20 @@ using System.Threading.Tasks;
 
 namespace 스레드
 {
+    //선수 정의
+    class Player
+    {
+        //정적변수로 순위를 저장하는 배열과 인덱스저장 변수 선언
+
+        //현재 지점, 등번호, 종료 여부
+
+        //서브스레드로 동작할 달리기 함수 정의
     }
     class Program
     {
         static void Main(string[] args)
         {
-           
+            //시작 종료 여부 다 종료하면 결과 출력
         }
     }
 }
