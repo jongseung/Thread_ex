@@ -64,6 +64,9 @@ namespace 스레드
             List<Task> tasks = new List<Task>();
             for (int i = 0; i < 20; i++)
             {
+                //매개변수 있는 서브스레드 생성
+
+                //서브스레드 한개 생성
                 //Task task = new Task(new Action(thread_func2)); //Action은 매개변수가 없는 메소드?를 넣어야한다.
                 //task.Start(); //서브스레드 시작
                 tasks.Add(new Task(new Action(thread_func2)));
